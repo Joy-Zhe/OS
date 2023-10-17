@@ -26,8 +26,8 @@
 
 | 姓名 | 学号 | 分工 | 分配分数 |
 | --- | --- | --- | --- |
-|  |  |  | 50% |
-|  |  |  | 50% |
+| 郑乔尹 | 3210104169 | 完成一份lab2 | 50% |
+| 陈震翔 | 3210103924 | 完成一份lab2 | 50% |
 
 
 
@@ -130,7 +130,7 @@ void intr_enable(void) {
 
 void intr_disable(void) {
   // TODO: 设置 sstatus[spie] = 0
-      clear_csr(sstatus, ~(1 << 5));
+      clear_csr(sstatus, 1 << 5);
 }
 ```
 
@@ -143,7 +143,7 @@ void intr_disable(void) {
 1. RISC-V 是如何实现 S 态中断的屏蔽与使能的？_____________________________
 （提示：RISC-V 是如何控制 sstatus.SIE 与 sstatus.SPIE 的，它们分别代表什么含义）
 
-
+`sstatus[SIE]`控制S态中断的使能，`sstatus[SPIE]`保存中断前的CPU运行状态 
 
 2. 请验证在 lab1 中触发时钟中断时，cpu 处于 S 态，而 lab2 中触发时钟中断时，cpu处于 U 态，请给出sstatus的截图并作出解释：___________________________________________________
 （提示：触发中断后，会进入中断处理流程，此时通过 gdb 查看 sstatus 寄存器，可以知道进入中断前 cpu处于什么态。）
@@ -236,7 +236,14 @@ void task_init(void) {
     // get the task_struct based on Kernel_Page and i
     // set state = TASK_RUNNING, counter = 0, priority = 5, 
     // blocked = 0, pid = i, thread.sp, thread.ra
-
+	task[i] = (struct task_struct *)(Kernel_Page + i * PAGE_SIZE); // low mem
+    task[i]->state = TASK_RUNNING;
+    task[i]->counter = 0;
+    task[i]->priority = 5;
+    task[i]->blocked = 0;
+    task[i]->pid = i;
+    task[i]->thread.sp = (unsigned long)(Kernel_Page + (i + 1) * PAGE_SIZE); // high mem
+    task[i]->thread.ra = (unsigned long)__init_sepc;                         // ra -> __init_sepc
     printf("[PID = %d] Process Create Successfully!\n", task[i]->pid);
   }
   task_init_done = 1;
@@ -271,17 +278,44 @@ void do_timer(void) {
   
   // current process's counter -1, judge whether to schedule or go on.
   // TODO
-  
+  current->counter--;
+  if (current->counter == 0) {
+    schedule();
+  }
 }
 
 // Select the next task to run. If all tasks are done(counter=0), reinitialize all tasks.
 void schedule(void) {
   unsigned char next;
   // TODO
-  
-  
+  unsigned int min_counter = 0x7fffffff;
+  for (int i = NR_TASKS - 1; i >= 0; i--)
+  {
+    if (task[i] == 0){
+      continue;
+    }
+    if (task[i]->counter > 0 && task[i]->counter < min_counter && task[i]->state == TASK_RUNNING)
+    {
+      min_counter = task[i]->counter;
+      next = i;
+    }
+  }
+
+  if (min_counter == 0x7fffffff)
+  {
+    init_test_case();
+    for (int i = NR_TASKS - 1; i >= 0; i--)
+    {
+      if (task[i] == 0) {
+        continue;
+      }
+      if (task[i]->counter > 0 && task[i]->counter < min_counter && task[i]->state == TASK_RUNNING) {
+        min_counter = task[i]->counter;
+        next = i;
+      }
+    }
+  }
   show_schedule(next);
-  
   switch_to(task[next]);
 }
 
@@ -319,15 +353,57 @@ void do_timer(void) {
   
   // current process's counter -1, judge whether to schedule or go on.
   // TODO
-    
+	current->counter--;
+	schedule();
 }
 
 // Select the task with highest priority and lowest counter to run. If all tasks are done(counter=0), reinitialize all tasks.
 void schedule(void) {
   unsigned char next;
   // TODO
-  
+  unsigned int min_priority = 0x7fffffff;
+  unsigned char flag = 0; // if all tasks are done, 1 represents all done
+  for (int i = NR_TASKS - 1; i >= 0; i--)
+  {
+    if (task[i] == 0) {
+      continue;
+    }
+    if (task[i]->counter > 0 && task[i]->priority <= min_priority && task[i]->state == TASK_RUNNING) { // higher or equal priority
+      flag = 1;
+      if (task[i]->priority == min_priority)
+      {                                               // equal priority
+        if (task[i]->counter < task[next]->counter) { // less time left, update next
+          next = i;
+        }
+      }
+      else { // higher priority, update
+        min_priority = task[i]->priority;
+        next = i;
+      }
+    }
+  }
 
+  if (flag == 1) { // left time all zero
+    init_test_case();
+    for (int i = NR_TASKS - 1; i >= 0; i--) {
+      if (task[i] == 0) {
+        continue;
+      }
+      if (task[i]->counter > 0 && task[i]->priority <= min_priority && task[i]->state == TASK_RUNNING) { // higher or equal priority
+        flag = 1;
+        if (task[i]->priority == min_priority)
+        {                                               // equal priority
+          if (task[i]->counter < task[next]->counter) { // less time left, update next
+            next = i;
+          }
+        }
+        else { // higher priority, update
+          min_priority = task[i]->priority;
+          next = i;
+        }
+      }
+    }
+  }
   show_schedule(next);
 
   switch_to(task[next]);
@@ -373,16 +449,44 @@ __switch_to:
 	add   a3, a0, a4
 	add   a4, a1, a4
 	# TODO: Save context into prev->thread
-
+	# a0:struct task_struct* prev
+	# a1:struct task_struct* next
+	sd ra, 0 * reg_size(a3)
+	sd sp, 1 * reg_size(a3)
+	sd s0, 2 * reg_size(a3)
+	sd s1, 3 * reg_size(a3)
+	sd s2, 4 * reg_size(a3)
+	sd s3, 5 * reg_size(a3)
+	sd s4, 6 * reg_size(a3)
+	sd s5, 7 * reg_size(a3)
+	sd s6, 8 * reg_size(a3)
+	sd s7, 9 * reg_size(a3)
+	sd s8, 10 * reg_size(a3)
+	sd s9, 11 * reg_size(a3)
+	sd s10, 12 * reg_size(a3)
+	sd s11, 13 * reg_size(a3)
 	# TODO: Restore context from next->thread
-
+	ld ra, 0 * reg_size(a4)
+	ld sp, 1 * reg_size(a4)
+	ld s0, 2 * reg_size(a4)
+	ld s1, 3 * reg_size(a4)
+	ld s2, 4 * reg_size(a4)
+	ld s3, 5 * reg_size(a4)
+	ld s4, 6 * reg_size(a4)
+	ld s5, 7 * reg_size(a4)
+	ld s6, 8 * reg_size(a4)
+	ld s7, 9 * reg_size(a4)
+	ld s8, 10 * reg_size(a4)
+	ld s9, 11 * reg_size(a4)
+	ld s10, 12 * reg_size(a4)
+	ld s11, 13 * reg_size(a4)
 	# return to ra
 	ret
 ```
 
 
 **为什么要设置前三行汇编指令？**
-答：___________________________________________
+答：定位地址到两个对应的`thread_struct`___________________________________________
 
 
 #### 3.4.2 __init_epc（10%）
@@ -511,7 +615,8 @@ trap_s 剩余部分代码，恢复 B 进程的 saved register
 .globl __init_sepc
 __init_sepc:
 	# TODO
-    
+    la t0, test
+	csrw sepc, t0
 	sret
 ```
 
@@ -537,11 +642,11 @@ __init_sepc:
 
 请在此附上你的代码运行结果截图。
 ##### 短作业优先非抢占式算法
-答：___________________________________________
+答：___________________________________________![[lab2p1.png]]
 
 
 ##### 优先级抢占式算法
-答：___________________________________________
+答：_![[lab2p2.png]]
 
 
 ##### 短作业优先非抢占式算法
@@ -578,136 +683,3 @@ __init_sepc:
 
 由于本实验为新实验，可能存在不足之处，欢迎同学们对本实验提出建议。
 
-
-## 附录
-
-
-### A.进程调度
-
-
-#### 1. 进程与线程
-
-
-源代码经编译器一系列处理（编译、链接、优化等）后得到的可执行文件，我们称之为程序（Program）。而通俗地说，进程（Process）就是**正在运行**并使用计算机资源的程序。为了运行程序，操作系统需要给进程分配一定的资源——程序的代码、数据段被加载到内存中，构建程序所需的虚拟内存空间，以及分配其他页表、文件等资源。
-
-
-出于 OS 对计算机系统精细管理的目的，线程的概念将“正在运行”的动态特性从进程中剥离出来，这样的一个借助 CPU 和栈的执行流，我们称之为**线程 (Thread)** 。因此，进程虽然仍是代表一个正在运行的程序，但是其主要功能是作为**资源的分配单位**，管理页表、文件、网络等资源。而一个进程的多个线程则共享这些资源，专注于执行，从而作为**执行的调度单位**。
-
-
-举一个例子，为了分配给进程一段内存，操作系统把一整个页表交给进程，此时进程内部的所有线程看到的是同样的页表，即相同的地址，但是不同的线程有自己的栈（会放在相同地址空间的不同位置），CPU 也会以线程作为一个基本调度单位。
-
-
-一个进程可以有多个线程，也可以如传统进程一样只有一个线程。在本次调度算法模拟实验中，我们**假设**操作系统未引入线程的概念，即一个进程只有一个线程，因此对线程的调度可以简化为对进程的调度。但同学们还是要记住，在引入线程的操作系统中，**进程是资源分配的最小单位，而线程是调度的最小单位**。
-
-
-#### 2. 本实验中进程调度与切换的过程
-
-
-- 在每次**时钟中断处理**时，操作系统首先会将当前进程的剩余运行时间减少一个单位。之后根据调度算法来确定是继续运行还是调度其他进程来执行。
-- 在**进程调度**时，操作系统会对所有可运行的进程进行判断，按照一定规则选出下一个执行的进程。如果没有符合条件的进程，则会对所有进程的优先级和剩余运行时间相关属性进行更新，再重新选择。最终将选择得到的进程与当前进程切换。
-- 在**进程切换**的过程中，首先我们需要保存当前进程的执行上下文，再将将要执行进程的上下文载入到相关寄存器中，至此我们完成了进程的调度与切换。
-
-
-
-#### 3. 进程的表示
-
-
-在不同的操作系统中，为每个进程所保存的信息都不同。在这里，我们提供一种**基础的实现**，每个进程会包括：
-
-
-- 进程ID：用于唯一确认一个进程。
-- 运行时间片：为每个进程分配的运行时间。
-- 优先级：在调度时，配合调度算法，来选出下一个执行的进程。
-- 运行栈：每个进程都必须有一个独立的运行栈，保存运行时的数据。
-- 执行上下文：当进程不在执行状态时，我们需要保存其上下文（其实就是状态寄存器的值），这样之后才能够将其恢复，继续运行。
-
-
-
-相应的，`sched.h` 中数据结构定义如下，请确保理解后再进行之后的实验。
-
-
-```c
-#pragma once
-
-#define TASK_SIZE (4096)
-#define THREAD_OFFSET (5 * 0x08)
-
-#ifndef __ASSEMBLER__
-
-/* task的最大数量 */
-#define NR_TASKS 64
-
-#define FIRST_TASK (task[0])
-#define LAST_TASK (task[NR_TASKS - 1])
-
-/* 定义task的状态，Lab2中task只需要一种状态。*/
-#define TASK_RUNNING 0
-// #define TASK_INTERRUPTIBLE       1
-// #define TASK_UNINTERRUPTIBLE     2
-// #define TASK_ZOMBIE              3
-// #define TASK_STOPPED             4
-
-#define PREEMPT_ENABLE 0
-#define PREEMPT_DISABLE 1
-
-/* Lab2中进程的数量以及每个进程初始的时间片 */
-#define LAB_TEST_NUM 5
-#define LAB_TEST_COUNTER 5
-
-/* 当前进程 */
-extern struct task_struct* current;
-
-/* 进程指针数组 */
-extern struct task_struct* task[NR_TASKS];
-
-/* 进程状态段数据结构 */
-struct thread_struct {
-  unsigned long long ra;
-  unsigned long long sp;
-  unsigned long long s0;
-  unsigned long long s1;
-  unsigned long long s2;
-  unsigned long long s3;
-  unsigned long long s4;
-  unsigned long long s5;
-  unsigned long long s6;
-  unsigned long long s7;
-  unsigned long long s8;
-  unsigned long long s9;
-  unsigned long long s10;
-  unsigned long long s11;
-};
-
-/* 进程数据结构 */
-struct task_struct {
-  long state;                  // 进程状态 Lab3中进程初始化时置为TASK_RUNNING
-  long counter;                // 运行剩余时间
-  long priority;               // 运行优先级 1最高 5最低
-  long blocked;
-  long pid;                    // 进程标识符
-                               // Above Size Cost: 40 bytes
-
-  struct thread_struct thread; // 该进程状态段
-};
-
-/* 进程初始化 创建四个dead_loop进程 */
-void task_init(void);
-
-/* 在时钟中断处理中被调用 */
-void do_timer(void);
-
-/* 调度程序 */
-void schedule(void);
-
-/* 切换当前任务current到下一个任务next */
-void switch_to(struct task_struct* next);
-
-extern void __switch_to(struct task_struct* prev, struct task_struct* next);
-
-/* 死循环 */
-void dead_loop(void);
-
-extern void __init_sepc(void);
-
-#endif
-```
