@@ -164,14 +164,14 @@ void schedule(void)
   unsigned char next;
   // TODO
   unsigned int min_priority = 0x7fffffff;
-  unsigned char flag = 0; // if all tasks are done, 1 represents all done
+  unsigned char flag = 1; // if all tasks are done, 1 represents all done
   for (int i = NR_TASKS - 1; i >= 0; i--)
   {
     if (task[i] == 0) {
       continue;
     }
     if (task[i]->counter > 0 && task[i]->priority <= min_priority && task[i]->state == TASK_RUNNING) { // higher or equal priority
-      flag = 1;
+      flag = 0;
       if (task[i]->priority == min_priority)
       {                                               // equal priority
         if (task[i]->counter < task[next]->counter) { // less time left, update next
