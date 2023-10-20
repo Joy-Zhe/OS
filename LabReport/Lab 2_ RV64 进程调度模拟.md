@@ -142,7 +142,9 @@ void intr_disable(void) {
 1. RISC-V 是如何实现 S 态中断的屏蔽与使能的？_____________________________
 （提示：RISC-V 是如何控制 sstatus.SIE 与 sstatus.SPIE 的，它们分别代表什么含义）
 
-`sstatus[SIE]`控制S态中断的使能，`sstatus[SPIE]`保存中断前的CPU运行状态 
++ *SIE*: Supervisor Interrupt Enable;  *SPIE*: Supervisor Previous Interrupt Enable
++ `sstatus[SIE]`控制S态中断的使能，`sstatus[SIE]`被设置为1时，S态中断被允许，即S态处理器可以响应中断。当`SIE`位被清除为0时，S态中断被禁止，S态处理器将不会响应中断
++ `sstatus[SPIE]`保存了上一个中断处理过程中`SIE`位的值。当发生中断时，处理器会根据`SPIE`位的值来确定中断处理完成后是否重新允许S态中断。如果`SPIE`位为1，那么中断处理完成后，`SIE`位会被恢复到1，允许再次处理S态中断。如果`SPIE`位为0，那么中断处理完成后，`SIE`位不会被恢复，继续禁止S态中断。
 
 2. 请验证在 lab1 中触发时钟中断时，cpu 处于 S 态，而 lab2 中触发时钟中断时，cpu处于 U 态，请给出sstatus的截图并作出解释：
 （提示：触发中断后，会进入中断处理流程，此时通过 gdb 查看 sstatus 寄存器，可以知道进入中断前 cpu处于什么态。）
@@ -152,6 +154,7 @@ void intr_disable(void) {
 (gdb) p/x $sstatus
 (gdb) b intr_enable
 (gdb) b clock_init
+(gdb) b task_init
 (gdb) continue 
 (gdb) p/x $sstatus
 (gdb) continue 
@@ -160,7 +163,7 @@ void intr_disable(void) {
 (gdb) p/x $sstatus
 ```
 1. Lab2：![p1](../img/Lab2/Lab2q2p_lab2.png)
-+ 可以看到在时钟中断使能前，还未进入中断，此时sstatus的值为$0x8000000000006000$时钟中断使能后，执行`clock_init`前，此时已经进入中断过程，sstatus的值为$0x8000000000006020$，可以看到`sstatus[SPIE]=1`,代表进入中断前，CPU处于**User Mode**。
++ 可以看到在时钟中断使能前，还未进入中断，此时sstatus的值为$0x8000000000006000$时钟中断使能后，执行`clock_init`前，此时已经进入中断过程，sstatus的值为$0x8000000000006020$，可以看到`sstatus[SPP]=0`,代表进入中断前，CPU处于**User Mode**。
 
 3. lab2 中，我们是什么时候第一次进入U态的？请给出第一次进入U态的代码位置或截图：________________________
 （提示：sstatus 记录了进入中断前 cpu 处于什么状态，执行 sret 会回到该状态）
