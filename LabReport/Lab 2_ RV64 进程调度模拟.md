@@ -106,7 +106,7 @@
 1. switch_to 函数，更新 current 变量，然后调用 __switch_to 函数，做实际切换操作。
 1. __switch_to 函数把当前进程的一些寄存器保存到进程的结构体中，然后读取要切换到的进程的寄存器。
 1. 通过 ra 寄存器跳转到目标进程的执行位置处，开始正常执行下一个任务。
-### 
+
 ### 3.2 init.c中打开中断开关（20%）
 
 
@@ -162,13 +162,13 @@ void intr_disable(void) {
 (gdb) continue 
 (gdb) p/x $sstatus
 ```
-1. Lab2：![p1](../img/Lab2/Lab2q2p_lab2.png)
+1. Lab2：![p1](./img/Lab2/Lab2q2p_lab2.png)
 + 可以看到在时钟中断使能前，还未进入中断，此时sstatus的值为$0x8000000000006000$时钟中断使能后，执行`clock_init`前，此时已经进入中断过程，sstatus的值为$0x8000000000006020$，可以看到`sstatus[SPP]=0`,代表进入中断前，CPU处于**User Mode**。
 
 3. lab2 中，我们是什么时候第一次进入U态的？请给出第一次进入U态的代码位置或截图：________________________
 （提示：sstatus 记录了进入中断前 cpu 处于什么状态，执行 sret 会回到该状态）
 
-+ 在`call_first_process`中第一次进入U态![](../img/Lab2/lab2q3.png)
++ 在`call_first_process`中第一次进入U态![](./img/Lab2/lab2q3.png)
 
 
 
@@ -665,16 +665,16 @@ __init_sepc:
 
 请在此附上你的代码运行结果截图。
 ##### 短作业优先非抢占式算法
-答：13425![](../img/Lab2/lab2p0.png)54213:![](../img/Lab2/lab2p1.png)
-54321:![](../img/Lab2/lab2p3.png)
+答：13425![](./img/Lab2/lab2p0.png)54213:![](./img/Lab2/lab2p1.png)
+54321:![](./img/Lab2/lab2p3.png)
 
 ##### 优先级抢占式算法
 答：
-43152:![](../img/Lab2/lab2part2p1.png)![](../img/Lab2/lab2part2p2.png)
-![](../img/Lab2/lab2part2p3.png)
-42135:![](../img/Lab2/lab2part2p4.png)![](../img/Lab2/lab2part2p5.png)
+43152:![](./img/Lab2/lab2part2p1.png)![](./img/Lab2/lab2part2p2.png)
+![](./img/Lab2/lab2part2p3.png)
+42135:![](./img/Lab2/lab2part2p4.png)![](./img/Lab2/lab2part2p5.png)
 
-54321:![](../img/Lab2/lab2part2p6.png)
+54321:![](./img/Lab2/lab2part2p6.png)
 
 
 ##### 短作业优先非抢占式算法
