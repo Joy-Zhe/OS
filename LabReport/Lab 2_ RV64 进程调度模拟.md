@@ -26,8 +26,8 @@
 
 | 姓名 | 学号 | 分工 | 分配分数 |
 | --- | --- | --- | --- |
-| 郑乔尹 | 3210104169 | 完成一份lab2 | 50% |
-| 陈震翔 | 3210103924 | 完成一份lab2 | 50% |
+| 郑乔尹 | 3210104169 | 完成lab2 | 50% |
+| 陈震翔 | 3210103924 | 完成lab2 | 50% |
 
 
 
@@ -148,7 +148,20 @@ void intr_disable(void) {
 
 2. 请验证在 lab1 中触发时钟中断时，cpu 处于 S 态，而 lab2 中触发时钟中断时，cpu处于 U 态，请给出sstatus的截图并作出解释：
 （提示：触发中断后，会进入中断处理流程，此时通过 gdb 查看 sstatus 寄存器，可以知道进入中断前 cpu处于什么态。）
-+ 通过`make debug`然后调试vmlinux(`riscv64-unknown-linux-gnu-gdb vmlinux`)进行gdb调试，通过以下命令查看触发中断前后sstatus寄存器的值：
++ 通过`make debug`然后调试vmlinux(`riscv64-unknown-linux-gnu-gdb vmlinux`)进行gdb调试，通过以下命令查看触发中断前后sstatus寄存器的值（注意SPP位为`sstatus[8]`，1代表S mode，0代表U mode）：
+```shell
+(gdb) target remote localhost:1234
+(gdb) b clock_init
+(gdb) b clock_set_next_event
+(gdb) continue
+(gdb) p/x $sstatus
+(gdb) continue
+(gdb) p/x $sstatus
+```
+1. Lab1:
+![](./img/Lab2/lab2q1p3.png)
++ 可以看到触发时钟中断时sstatus的值为$0x8000000000006120$，`sstatus[SPP]=1`，代表进入中断时，CPU处于**Supervisor Mode**。
+2. Lab2：
 ```shell
 (gdb) target remote localhost:1234
 (gdb) p/x $sstatus
@@ -162,10 +175,10 @@ void intr_disable(void) {
 (gdb) continue 
 (gdb) p/x $sstatus
 ```
-1. Lab2：![p1](./img/Lab2/Lab2q2p_lab2.png)
-+ 可以看到在时钟中断使能前，还未进入中断，此时sstatus的值为$0x8000000000006000$时钟中断使能后，执行`clock_init`前，此时已经进入中断过程，sstatus的值为$0x8000000000006020$，可以看到`sstatus[SPP]=0`,代表进入中断前，CPU处于**User Mode**。
+![p1](./img/Lab2/Lab2q2p_lab2.png)
++ 可以看到在时钟中断使能前，还未进入中断，此时sstatus的值为$0x8000000000006000$时钟中断使能后，执行`clock_init`前，此时已经进入中断过程，sstatus的值为$0x8000000000006020$，可以看到`sstatus[SPP]=0`,代表触发中断，CPU处于**User Mode**。
 
-3. lab2 中，我们是什么时候第一次进入U态的？请给出第一次进入U态的代码位置或截图：________________________
+6. lab2 中，我们是什么时候第一次进入U态的？请给出第一次进入U态的代码位置或截图：________________________
 （提示：sstatus 记录了进入中断前 cpu 处于什么状态，执行 sret 会回到该状态）
 
 + 在`call_first_process`中第一次进入U态![](./img/Lab2/lab2q3.png)
@@ -509,13 +522,13 @@ __switch_to:
 
 
 **为什么要设置前三行汇编指令？**
-答：定位地址到两个对应的`thread_struct`的低地址___________________________________________
-
+答：__定位地址到两个进程对应的`thread_struct`的低地址
 
 #### 3.4.2 __init_epc（10%）
 
 
 为什么本实验在初始化时需要为 Task[0-4] 的 ra 寄存器指定为`__init_sepc`？
++ 因为此时该进程还没有运行过，还不知道sepc应该为什么值，即进程信息中还没有保存过sepc，故第一次初始化时应当让ra设置为__init_sepc的地址，通过此函数设置对应的sepc为test函数的地址。
 
 
 对于正常的进程切换流程（假设从进程A切换到进程B），控制流如下：
@@ -708,6 +721,9 @@ __init_sepc:
 
 请在此处填写实验过程中遇到的问题及相应的解决方式。
 
++ 判定进程指针是否为空时，一开始手快了，直接写了`if (task == 0)`, 后面通过gdb调试，发现根本没有进行调度，过了一天才发现是把`task[i] == 0`的下标写漏了。
++ 关于验收：
+	+ 提问的时候，助教问了两个问题，很遗憾都没完全答对。第一个问题答错的部分是进程调度时，ra是什么，由于没有仔细阅读文档，我不了解进程调度过程中ra的值，现在我知道了ra存的是`switch_to`的函数代码地址，也给我一个很好的教训——不是只完成了实验效果就可以皆大欢喜，而是要彻底弄明白每一个实验细节。
+	+ 第二个问题是关于中断处理过程中，究竟是Supervisor Mode还是Machine Mode，实际上答案很明显，无论是指令(如`xret`)还是对应的`xIE`, `xPIE`位, 以及`xstatus`寄存器等，这里的`x`在中断处理中均为`s`，很明显是Supervisor Mode。不过其实在lab1中就说过，qemu完成初始化后，默认处于S态，所以还是以往知识掌握的不好。
 
-由于本实验为新实验，可能存在不足之处，欢迎同学们对本实验提出建议。
 
