@@ -3,7 +3,7 @@
 #include "test.h"
 
 int start_kernel() {
-  puts("ZJU OSLAB 4 学号 姓名\n");
+  puts("ZJU OSLAB 4 3210104169 郑乔尹 3210103924 陈震翔\n");
   
   
   task_init();
