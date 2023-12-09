@@ -311,8 +311,8 @@ void *kmalloc(size_t size) {
   
   // size 若在 kmem_cache_objsize 所提供的范围之内，则使用 slub allocator
   // 来分配内存
-  for (objindex = 0; objindex < NR_PARTIAL; objindex++) {
-    if(size <= kmem_cache_objsize[objindex]) {
+  for (objindex = 0; objindex < NR_PARTIAL; objindex++) { // enumerate size from kmem_cache_objsize: 8 - 2048, 9 kinds
+    if(size <= kmem_cache_objsize[objindex]) { // size available
       // TODO:
       p = kmem_cache_alloc(slub_allocator[objindex]);
       return p;
@@ -320,9 +320,9 @@ void *kmalloc(size_t size) {
   }
 
   // size 若不在 kmem_cache_objsize 范围之内，则使用 buddy system 来分配内存
-  if (objindex >= NR_PARTIAL) {
+  if (objindex >= NR_PARTIAL) { // no available size to allocate by kmem_cache_objsize
     // TODO:
-    p = alloc_page( (size - 1) / PAGE_SIZE + 1 );
+    p = alloc_page( (size - 1) / PAGE_SIZE + 1 ); 
 
     set_page_attr(p, (size - 1) / PAGE_SIZE, PAGE_BUDDY);
   }

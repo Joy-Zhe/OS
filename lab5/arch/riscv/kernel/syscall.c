@@ -36,7 +36,7 @@ struct ret_info syscall(uint64_t syscall_num, uint64_t arg0, uint64_t arg1, uint
         // 3. add the vma struct to the mm_struct's vma list
         // return the vm_start
         struct vm_area_struct * vma = (struct vm_area_struct *)kmalloc(sizeof(struct vm_area_struct));
-        if( vma == 0 ){
+        if( vma == 0 ){  // failed
             ret.a0 = -1;
         }else{
             vma->vm_start = arg0;

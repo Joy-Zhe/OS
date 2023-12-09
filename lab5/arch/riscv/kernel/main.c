@@ -4,7 +4,7 @@
 #include "sched.h"
 
 int start_kernel() {
-  puts("ZJU OSLAB 5 学号 姓名\n");
+  puts("ZJU OSLAB 5 3210103924 陈震翔 3210104169 郑乔尹\n");
   
   slub_init();
   task_init();
