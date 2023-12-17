@@ -74,20 +74,9 @@ struct ret_info syscall(uint64_t syscall_num, uint64_t arg0, uint64_t arg1, uint
         // 6. copy kernel stack (only need trap_s' stack)
         // 7. set new process a0 = 0, and ra = trap_s_bottom, sp = register number * 8
 
-        // TODO:
-        // 1. create new task and set counter, priority and pid (use our task array)
-        // 2. create root page table, set current process's satp
-        //   2.1 copy current process's user program address, create mapping for user program
-        //   2.2 create mapping for kernel address
-        //   2.3 create mapping for UART address
-        // 3. create user stack, copy current process's user stack and save user stack sp to new_task->sscratch
-        // 4. copy mm struct and create mapping
-        // 5. set current process a0 = new task pid, sepc += 4
-        // 6. copy kernel stack (only need trap_s' stack)
-        // 7. set new process a0 = 0, and ra = trap_s_bottom, sp = register number * 8
         int now;
         for(int i = 0; i < NR_TASKS; i++){
-            printf("test %d\n", i);
+            // printf("test %d\n", i);
             if (!task[i])
             {
                 task[i] = (struct task_struct*)(VIRTUAL_ADDR(alloc_page()));
@@ -188,7 +177,6 @@ struct ret_info syscall(uint64_t syscall_num, uint64_t arg0, uint64_t arg1, uint
         // 3. clear current task, set current task->counter = 0
         // 4. call schedule
 
-        // 1. free current process vm_area_struct and it's mapping area
         uint64_t root_page_table = (current->satp & ((1ULL << 44) - 1)) << 12;
         struct vm_area_struct* vma;
         list_for_each_entry(vma, &current->mm.vm->vm_list, vm_list) {
@@ -227,7 +215,7 @@ struct ret_info syscall(uint64_t syscall_num, uint64_t arg0, uint64_t arg1, uint
         //   4.1. change current process's priority
         //   4.2. call schedule to run other process
         //   4.3. goto 1. check again
-
+    
         int find_again = 1, find = 0;
         // 1. find the process which pid == arg0
         while (find_again) {

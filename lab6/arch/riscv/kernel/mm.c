@@ -25,8 +25,8 @@ uint64_t get_addr(int index) {
     level++;
   }
 
-  int block_size = MEMORY_SIZE >> level;
-  int offset = (index - (1 << level)) * block_size;
+  int block_size = (MEMORY_SIZE >> level) / PAGE_SIZE;
+  int offset = (index - (1 << level)) * block_size * PAGE_SIZE;
   return buddy_system.base_addr + offset;
 }
 
@@ -36,7 +36,7 @@ uint32_t get_block_size(int index) {
     index_copy >>= 1;
     level++;
   }
-  return MEMORY_SIZE >> level;
+  return (MEMORY_SIZE >> level) / PAGE_SIZE;
 }
 
 
@@ -68,6 +68,19 @@ void init_buddy_system() {
   buddy_system.initialized = 1;
 };
 
+void show_buddy_system() {
+  // 打印buddy system的bitmap
+  // 遍历buddy system的每个节点，打印其下标、状态和可分配的内存大小
+  // 如果一个节点未被分配，则不再打印其左右儿子节点
+  
+  for(int i = 1; i < 8192; ++i) {
+    if(check_split(buddy_system.bitmap[i/2])) {
+      printf("index: %d, size: %d, split: %d\n", i, get_size(buddy_system.bitmap[i]), check_split(buddy_system.bitmap[i]));
+    }
+  }
+
+}
+
 uint64_t alloc_buddy(int index, unsigned int num) {
   // DONE: 找到可分配的节点并完成分配，返回分配的物理页面的首地址（通过get_addr函数可以获取节点index的起始地址）
   // 1. 如果当前节点的可连续分配内存大于num，则查看当前节点的左右儿子节点
@@ -92,6 +105,7 @@ uint64_t alloc_buddy(int index, unsigned int num) {
   else if (get_size(buddy_system.bitmap[index]) == num) {
     if (!check_split(buddy_system.bitmap[index])) {
       buddy_system.bitmap[index] = 0;
+      // printf("alloc page: %d\n", index);
       return get_addr(index);
     }
     else {
@@ -100,7 +114,9 @@ uint64_t alloc_buddy(int index, unsigned int num) {
         addr = alloc_buddy(index * 2 + 1, num);
       }
       if (addr != 0) {
-        buddy_system.bitmap[index] = buddy_system.bitmap[index]-num;
+        buddy_system.bitmap[index] = set_split(
+          get_size(buddy_system.bitmap[index*2]) > get_size(buddy_system.bitmap[index*2+1]) ? 
+          get_size(buddy_system.bitmap[index*2]) : get_size(buddy_system.bitmap[index*2+1]));
       }
       return addr;
     }
@@ -115,6 +131,9 @@ uint64_t alloc_pages(unsigned int num) {
   if (!buddy_system.initialized) {
     init_buddy_system();
   }
+
+  uint64_t addr = 0;
+
   // DONE:
   // 1. 将num向上对齐到2的幂次
   // 2. 调用alloc_buddy函数完成分配
@@ -123,7 +142,14 @@ uint64_t alloc_pages(unsigned int num) {
   while (i < num) {
     i *= 2;
   }
-  uint64_t addr = alloc_buddy(1, i);
+  addr = alloc_buddy(1, i);
+
+  // set the allocated pages to 0
+  if (addr != 0) {
+    for(int i = 0; i < num * PAGE_SIZE; ++i) {
+      *(char *)(addr + i) = 0;
+    }
+  }
 
   return addr;
 }
@@ -146,12 +172,18 @@ void free_buddy(int index) {
   else {
     buddy_system.bitmap[index] = get_block_size(index);
     while (index != 1) {
-      if (buddy_system.bitmap[index] == buddy_system.bitmap[index ^ 1]) {
+      if (buddy_system.bitmap[index] == buddy_system.bitmap[index ^ 1] && !check_split(buddy_system.bitmap[index])) {
         buddy_system.bitmap[index / 2] = buddy_system.bitmap[index] + buddy_system.bitmap[index ^ 1];
         index /= 2;
       }
       else {
-        break;
+        unsigned int old_size = buddy_system.bitmap[index / 2];
+        buddy_system.bitmap[index / 2] = set_split(get_size(buddy_system.bitmap[index]) > get_size(buddy_system.bitmap[index ^ 1]) ?
+        get_size(buddy_system.bitmap[index]) : get_size(buddy_system.bitmap[index ^ 1]));
+        if (old_size == buddy_system.bitmap[index / 2]) {
+          break;
+        }
+        index /= 2;
       }
     }
   }
@@ -171,6 +203,7 @@ void free_pages(uint64_t pa) {
   while(check_split(buddy_system.bitmap[index])) {
     index *= 2;
   }
+  // printf("free page: %d\n", index);
   free_buddy(index);
 
 
