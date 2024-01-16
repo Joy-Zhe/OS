@@ -126,7 +126,7 @@ struct node{
 typedef struct node* list;
 typedef struct node* node;
 
-void list_del( node delNode  ){
+void List_del( node delNode  ){
     if( delNode->prve != NULL ) delNode->prve->next = delNode->next;
     if( delNode->next != NULL ) delNode->next->prve = delNode->prve;
     delNode->prve = NULL;
@@ -134,7 +134,7 @@ void list_del( node delNode  ){
 }
 
 //在Node节点后面插入addNode节点
-void list_add( node Node, node addNode ){
+void List_add( node Node, node addNode ){
     addNode->prve = Node;
     addNode->next = Node->next;
     Node->next = addNode;
