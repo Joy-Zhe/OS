@@ -85,6 +85,8 @@ struct file {
   struct sfs_inode * path;
   uint64_t flags;
   uint64_t off;
+  uint32_t blockno;
+  uint32_t pathBlockno;
   // 可以增加额外数据来辅助你的缓存管理
 };
 

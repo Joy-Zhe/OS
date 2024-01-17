@@ -117,7 +117,7 @@ int sfs_get_files(const char* path, char* files[]);
 typedef char bitmap;
 
 struct node{
-    struct sfs_memory_block block;
+    struct sfs_memory_block * block;
     struct node * prve;
     struct node * next;
 };
