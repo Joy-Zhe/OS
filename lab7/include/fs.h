@@ -126,20 +126,16 @@ struct node{
 typedef struct node* list;
 typedef struct node* node;
 
-void List_del( node delNode  ){
-    if( delNode->prve != NULL ) delNode->prve->next = delNode->next;
-    if( delNode->next != NULL ) delNode->next->prve = delNode->prve;
-    delNode->prve = NULL;
-    delNode->next = NULL;
-}
+void List_del(node delNode);
 
 //在Node节点后面插入addNode节点
-void List_add( node Node, node addNode ){
-    addNode->prve = Node;
-    addNode->next = Node->next;
-    Node->next = addNode;
-    if( addNode->next != NULL ) addNode->next->prve = addNode;
-}
+void List_add(node Node, node addNode);
+
+int strcmp(const char *a, const char *b);
+
+int read_indirect_block(uint32_t indirect_block_number, uint32_t block_index);
+
+uint32_t get_indirect_block(struct sfs_inode *inode, uint32_t indirect_index);
 
 struct sfs_fs {
     struct sfs_super super;           // SFS 的超级块

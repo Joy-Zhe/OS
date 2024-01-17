@@ -7,6 +7,20 @@
 #include "vm.h"
 #include "mm.h"
 
+void List_add( node Node, node addNode ){
+    addNode->prve = Node;
+    addNode->next = Node->next;
+    Node->next = addNode;
+    if( addNode->next != NULL ) addNode->next->prve = addNode;
+}
+
+void List_del( node delNode  ){
+    if( delNode->prve != NULL ) delNode->prve->next = delNode->next;
+    if( delNode->next != NULL ) delNode->next->prve = delNode->prve;
+    delNode->prve = NULL;
+    delNode->next = NULL;
+}
+
 // --------------------------------------------------
 // ----------- read and write interface -------------
 
@@ -20,6 +34,7 @@ void disk_op(int blockno, uint8_t *data, bool write) {
 
 #define disk_read(blockno, data) disk_op((blockno), (data), 0)
 #define disk_write(blockno, data) disk_op((blockno), (data), 1)
+#define min(a, b) (a <= b) ? a : b
 
 // -------------------------------------------------
 // ------------------ your code --------------------
@@ -66,13 +81,19 @@ int getEmptyBlock(){
     SFS.super_dirty = 1;
     SFS.super.unused_blocks--;
     SFS.super.blocks++;
-    bitmap * temp = SFS.freemap;
-    for( int i = 0; i < 512; i++ ){
-        if( temp[i] != 0b11111111 ){
-            for( int j = 0; j < 8; j++ ){
-                if( (temp[i] >> j) & 0b1 == 0 ){
+    bitmap *temp = SFS.freemap;
+    // printf("%d\n", SFS.freemap[0]);
+    for (int i = 0; i < 512; i++)
+    {
+        if (temp[i] != 0b11111111)
+        { // 有空闲块
+            for (int j = 0; j < 8; j++)
+            {
+                if (((temp[i] >> j) & 0b00000001) == 0)
+                { // 对应位为0，空闲
                     temp[i] = temp[i] | (1 << j);
-                    return i*8+j;
+                    // printf("%d\n", i * 8 + j);
+                    return (i * 8 + j);
                 }
             }
         }
@@ -158,8 +179,11 @@ int sfs_open(const char *path, uint32_t flags){
     if( isInit == 0 ){
         if( sfs_init() != 0 ) return -1;
     }
+    // for( int i = 0; i < 10; i++ ){
+    //     printf("%d/n",getEmptyBlock());
+    // }
     if( path[0] != '/' ) return -1;
-    if( flags != SFS_FLAG_READ && flags != SFS_FLAG_WRITE ) return -1;
+    if( flags != SFS_FLAG_READ && flags != SFS_FLAG_WRITE && flags != (SFS_FLAG_READ | SFS_FLAG_WRITE)) return -1;
     char filename[SFS_MAX_FILENAME_LEN + 1];
     int i = 1;
     if( SFS.hash_list[1] == NULL ){
@@ -196,7 +220,7 @@ int sfs_open(const char *path, uint32_t flags){
             struct sfs_entry * entry;
             for( ; k < SFS_NDIRECT; k++ ){
                 if( dir->block->block.din->direct[k] == 0 ){
-                    emptyEntry = k;
+                    if( emptyEntry == -1 ) emptyEntry = k;
                     continue;
                 }
                 currentNode = SFS.hash_list[dir->block->block.din->direct[k]];
@@ -230,7 +254,7 @@ int sfs_open(const char *path, uint32_t flags){
                     uint32_t * t2 = t1->block->block.block;
                     for( ; m < 1024; m++ ){
                         if( t2[m] == 0 ){
-                            emptyEntry = SFS_NDIRECT + m;
+                            if( emptyEntry == -1 ) emptyEntry = SFS_NDIRECT + m;
                             continue;
                         }
                         currentNode = SFS.hash_list[t2[m]];
@@ -261,7 +285,7 @@ int sfs_open(const char *path, uint32_t flags){
                     }
                 }
                 if( dir->block->block.din->indirect == 0 || m == 1024 ){
-                    if( flags == SFS_FLAG_WRITE ){
+                    if( flags == SFS_FLAG_WRITE || flags == (SFS_FLAG_READ | SFS_FLAG_WRITE)){
                         if( emptyEntry == -1 ){
                             node t = SFS.inode_list->next;
                             for( ; t != SFS.hash_list[1]; t = t->next ){
@@ -272,10 +296,11 @@ int sfs_open(const char *path, uint32_t flags){
                         entry = kmalloc(4096); 
                         entry->ino = getEmptyBlock();
                         int index = 0;
-                        while( filename[index] != '\0' ){
-                            entry->filename[index] = filename[index++];
-                        }
-                        entry->filename[index] = '\0';
+                        // while( filename[index] != '\0' ){
+                        //     entry->filename[index] = filename[index++];
+                        // }
+                        // entry->filename[index] = '\0';
+                        memcpy( entry->filename, filename, sizeof(filename) );
                         if( emptyEntry < SFS_NDIRECT ){
                             dir->block->block.din->direct[emptyEntry] = newEntry(entry);
                         }else{
@@ -283,6 +308,7 @@ int sfs_open(const char *path, uint32_t flags){
                             uint32_t * t4 = t3->block->block.block;
                             t4[emptyEntry-SFS_NDIRECT] = newEntry(entry); 
                         }
+                        dir->block->dirty = 1;
                         struct sfs_inode * din = kmalloc(4096);
                         din->links = 1;
                         din->blocks = 1;
@@ -353,7 +379,7 @@ int sfs_close(int fd){
     struct file * f = current->fs.fds[fd];
     currentNode = SFS.hash_list[current->fs.fds[fd]->blockno];
     path = SFS.hash_list[current->fs.fds[fd]->pathBlockno];
-    while( path->block->blockno != 1 ){
+    while (path->block->blockno != 1){
         freeBlock( currentNode->block->blockno );
         currentNode = path;
         int i = 0;
@@ -384,7 +410,8 @@ int sfs_close(int fd){
             if( i == 1024 ) return -1;
         }
     }
-    freeBlock( path->block->blockno );
+    freeBlock( currentNode->block->blockno );
+    freeBlock(path->block->blockno);
     if( SFS.super_dirty ){
         disk_write( 0, &(SFS.super) );
         disk_write( 2, SFS.freemap );
@@ -396,7 +423,7 @@ int sfs_seek(int fd, int32_t off, int fromwhere){
         if( sfs_init() != 0 ) return -1;
     }
     struct file * f = current->fs.fds[fd];
-    uint64_t offtemp = -1;
+    int32_t offtemp = -1;
     switch(fromwhere){
         case SEEK_SET:{
             offtemp = off;
@@ -587,6 +614,7 @@ int sfs_get_files(const char* path, char* files[]){
     node currentNode = SFS.hash_list[1], dir = NULL;
     int j = 0;
     bool flag = 1;
+    if( strcmp( path, "/" ) == 0 ) flag = 0;
     while( flag ){
         if( path[i] != '/' && path[i] != '\0' ){
             filename[j++] = path[i];
@@ -672,6 +700,7 @@ int sfs_get_files(const char* path, char* files[]){
         }
         i++;
     }
+
     int f = 0;
     node temp;
     for( int k = 0; k < SFS_NDIRECT; k++ ){
@@ -679,7 +708,7 @@ int sfs_get_files(const char* path, char* files[]){
         temp = SFS.hash_list[currentNode->block->block.din->direct[k]];
         if( temp == NULL ) temp = loadBlock( currentNode->block->block.din->direct[k], 0 );
         struct sfs_entry * entry = temp->block->block.block;
-        files[f++] = entry->filename;
+        memcpy(files[f++], entry->filename, sizeof(entry->filename));
     }
     if( currentNode->block->block.din->indirect != 0){
         temp = SFS.hash_list[currentNode->block->block.din->indirect];
@@ -690,12 +719,16 @@ int sfs_get_files(const char* path, char* files[]){
             temp = SFS.hash_list[t[k]];
             if( temp == NULL ) temp = loadBlock( t[k], 0 ); 
             entry = temp->block->block.block;
-            files[f++] = entry->filename;
+            memcpy(files[f++], entry->filename, sizeof(entry->filename));
         }
     }
-    temp = SFS.inode_list->next;
-    for( ; temp != SFS.hash_list[1]; temp = temp->next ){
-        if( temp->block->is_inode ) freeBlock( temp->block->blockno );
+    if( flag != 0 ){
+        temp = SFS.inode_list->next;
+        for( ; temp != SFS.hash_list[1]; temp = temp->next ){
+            if( temp->block->is_inode ) freeBlock( temp->block->blockno );
+        }
+    }else{
+        freeBlock(1);
     }
     return f;
 }

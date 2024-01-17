@@ -16,21 +16,21 @@ extern uint64_t data_start;
 extern uint64_t user_program_start;
 extern void trap_s_bottom(void);
 
-int strcmp(const char *a, const char *b) {
-  while (*a && *b) {
-    if (*a < *b)
-      return -1;
-    if (*a > *b)
-      return 1;
-    a++;
-    b++;
-  }
-  if (*a && !*b)
-    return 1;
-  if (*b && !*a)
-    return -1;
-  return 0;
-}
+// int strcmp(const char *a, const char *b) {
+//   while (*a && *b) {
+//     if (*a < *b)
+//       return -1;
+//     if (*a > *b)
+//       return 1;
+//     a++;
+//     b++;
+//   }
+//   if (*a && !*b)
+//     return 1;
+//   if (*b && !*a)
+//     return -1;
+//   return 0;
+// }
 
 uint64_t get_program_address(const char * name) {
     uint64_t offset = 0;

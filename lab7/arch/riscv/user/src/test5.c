@@ -66,6 +66,13 @@ int main() {
     input[n] = '\0';
 
     if (strcmp(input, "ls") == 0) {
+      // for(int i = 0; i < 10; i++) printf( "%s\n", filename[i] );
+      // for (int i = 0; i < 10; i++)
+      // {
+      //   filename[i][27] = '\0';
+      //   printf("%s ", filename[i]);
+      // }
+      // printf( "%p\n", &filename );
       int len = sfs_get_files(path, filename);
       if (len < 0) {
         printf("ls failed");
