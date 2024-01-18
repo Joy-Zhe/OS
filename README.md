@@ -1,5 +1,5 @@
 # OS
-OS class of ZJU
+OS course of ZJU
 with [czx](https://github.com/1czx)
 
 ## Lab Contents
